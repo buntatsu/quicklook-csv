@@ -13,6 +13,7 @@
 #import <Cocoa/Cocoa.h>
 #import "CSVDocument.h"
 #import "CSVRowObject.h"
+#import "EncodingUtil.h"
 
 #define MAX_ROWS 500
 
@@ -29,29 +30,10 @@ static char* formatFilesize(float bytes);
 OSStatus GeneratePreviewForURL(void *thisInterface, QLPreviewRequestRef preview, CFURLRef url, CFStringRef contentTypeUTI, CFDictionaryRef options)
 {
 	@autoreleasepool {
-		NSError *theErr = nil;
 		NSURL *myURL = (__bridge NSURL *)url;
-		
-		// Load document data using NSStrings house methods
-		// For huge files, maybe guess file encoding using `file --brief --mime` and use NSFileHandle? Not for now...
+
 		NSStringEncoding stringEncoding;
-		NSString *fileString = [NSString stringWithContentsOfURL:myURL usedEncoding:&stringEncoding error:&theErr];
-		
-		// We could not open the file, probably unknown encoding; try ISO-8859-1
-		if (!fileString) {
-			stringEncoding = NSISOLatin1StringEncoding;
-			fileString = [NSString stringWithContentsOfURL:myURL encoding:stringEncoding error:&theErr];
-			
-			// Still no success, give up
-			if (!fileString) {
-				if (nil != theErr) {
-					NSLog(@"Error opening the file: %@", theErr);
-				}
-				
-				return noErr;
-			}
-		}
-		
+		NSString *fileString = [EncodingUtil stringWithContentsOfURL:myURL usedEncoding:&stringEncoding];
 		
 		// Parse the data if still interested in the preview
 		if (false == QLPreviewRequestIsCancelled(preview)) {
@@ -73,7 +55,8 @@ OSStatus GeneratePreviewForURL(void *thisInterface, QLPreviewRequestRef preview,
 				// compose the html
 				NSMutableString *html = [[NSMutableString alloc] initWithString:@"<!DOCTYPE html>\n"];
 				[html appendString:@"<html xmlns=\"http://www.w3.org/1999/xhtml\" lang=\"en\"><head>\n"];
-				[html appendFormat:@"<meta http-equiv=\"Content-Type\" content=\"text/html; charset=%s\" />\n", htmlReadableFileEncoding(stringEncoding)];
+				[html appendFormat:@"<meta http-equiv=\"Content-Type\" content=\"text/html; charset=%@\" />\n",
+                [EncodingUtil htmlReadableEncoding:stringEncoding]];
 				[html appendString:@"<style>\n"];
 				if (nil != css) {
 					[html appendString:css];
@@ -93,11 +76,11 @@ OSStatus GeneratePreviewForURL(void *thisInterface, QLPreviewRequestRef preview,
 				 numRows,
 				 (1 == numRowsParsed) ? NSLocalizedString(@"row", nil) : NSLocalizedString(@"rows", nil)
 				 ];
-				[html appendFormat:@"<div class=\"file_info\"><b>%s</b>, %@-%@, %s</div><table>",
+				[html appendFormat:@"<div class=\"file_info\"><b>%s</b>, %@-%@, %@</div><table>",
 				 formatFilesize([fileAttributes[NSFileSize] floatValue]),
 				 NSLocalizedString(separatorDesc, nil),
 				 NSLocalizedString(@"Separated", nil),
-				 humanReadableFileEncoding(stringEncoding)
+				 [EncodingUtil humanReadableEncoding:stringEncoding]
 				 ];
 				
 				// add the table rows
@@ -133,71 +116,9 @@ OSStatus GeneratePreviewForURL(void *thisInterface, QLPreviewRequestRef preview,
 	return noErr;
 }
 
+
 void CancelPreviewGeneration(void* thisInterface, QLPreviewRequestRef preview)
 {
-}
-
-
-
-#pragma mark - Output Utilities
-/**
- *  To be used for the generated HTML.
- */
-static char* htmlReadableFileEncoding(NSStringEncoding stringEncoding)
-{
-	if (NSUTF8StringEncoding == stringEncoding ||
-	   NSUnicodeStringEncoding == stringEncoding) {
-		return "utf-8";
-	}
-	if (NSASCIIStringEncoding == stringEncoding) {
-		return "ascii";
-	}
-	if (NSISOLatin1StringEncoding == stringEncoding) {
-		return "iso-8859-1";
-	}
-	if (NSMacOSRomanStringEncoding == stringEncoding) {
-		return "x-mac-roman";
-	}
-	if (NSUTF16BigEndianStringEncoding == stringEncoding ||
-	   NSUTF16LittleEndianStringEncoding == stringEncoding) {
-		return "utf-16";
-	}
-	if (NSUTF32StringEncoding == stringEncoding ||
-	   NSUTF32BigEndianStringEncoding == stringEncoding ||
-	   NSUTF32LittleEndianStringEncoding == stringEncoding) {
-		return "utf-32";
-	}
-	
-	return "utf-8";
-}
-
-
-static char* humanReadableFileEncoding(NSStringEncoding stringEncoding)
-{
-	if (NSUTF8StringEncoding == stringEncoding ||
-	   NSUnicodeStringEncoding == stringEncoding) {
-		return "UTF-8";
-	}
-	if (NSASCIIStringEncoding == stringEncoding) {
-		return "ASCII-text";
-	}
-	if (NSISOLatin1StringEncoding == stringEncoding) {
-		return "ISO-8859-1";
-	}
-	if (NSMacOSRomanStringEncoding == stringEncoding) {
-		return "Mac-Roman";
-	}
-	if (NSUTF16BigEndianStringEncoding == stringEncoding ||
-	   NSUTF16LittleEndianStringEncoding == stringEncoding) {
-		return "UTF-16";
-	}
-	if (NSUTF32StringEncoding == stringEncoding ||
-	   NSUTF32BigEndianStringEncoding == stringEncoding ||
-	   NSUTF32LittleEndianStringEncoding == stringEncoding) {
-		return "UTF-32";
-	}
-	
-	return "UTF-8";
 }
 
 

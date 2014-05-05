@@ -13,14 +13,15 @@
 + (NSString *) stringWithContentsOfURL:(NSURL *)url usedEncoding:(NSStringEncoding *) enc
 {
     NSError *theErr = nil;
-    NSData *data = [NSData dataWithContentsOfURL:url];
-    
+
     // Load document data using NSStrings house methods
     // For huge files, maybe guess file encoding using `file --brief --mime` and use NSFileHandle? Not for now...
     NSString *fileString = [NSString stringWithContentsOfURL:url usedEncoding:enc error:&theErr];
 
-    // We could not open the file, probably unknown encoding; try ISO-8859-1
+    // We could not open the file, probably unknown encoding; try Japanese
     if (!fileString) {
+        NSData *data = [NSData dataWithContentsOfURL:url];
+
         NSArray *encodings = @[
                                @(NSShiftJISStringEncoding),
                                @(NSJapaneseEUCStringEncoding),
@@ -29,21 +30,20 @@
                                ];
 
         
-        __block NSString *string;
-        __block NSStringEncoding tmp_enc;
+        __block NSString *blk_string;
+        __block NSStringEncoding blk_enc;
         
         [encodings enumerateObjectsUsingBlock:^(NSNumber *encoding, NSUInteger idx, BOOL *stop) {
-            string = [[NSString alloc] initWithData:data encoding:encoding.unsignedIntegerValue];
-            
-            // Return the first encoding that works :)
-            if (string != nil) {
-                tmp_enc = encoding.unsignedIntegerValue;
+            blk_string = [[NSString alloc] initWithData:data encoding:encoding.unsignedIntegerValue];
+
+            if (blk_string != nil) {
+                blk_enc = encoding.unsignedIntegerValue;
                 *stop = YES;
             }
         }];
-        *enc = tmp_enc;
-        fileString = string;
-        
+        *enc = blk_enc;
+        fileString = blk_string;
+
         if (!fileString) {
             *enc = NSISOLatin1StringEncoding;
             fileString = [NSString stringWithContentsOfURL:url encoding:*enc error:&theErr];
@@ -60,6 +60,7 @@
     }
     return fileString;
 }
+
 
 + (NSString *) htmlReadableEncoding:(NSStringEncoding) stringEncoding;
 {

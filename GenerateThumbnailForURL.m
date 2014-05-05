@@ -4,6 +4,7 @@
 #import <Cocoa/Cocoa.h>
 #import "CSVDocument.h"
 #import "CSVRowObject.h"
+#import "EncodingUtil.h"
 
 #define THUMB_SIZE 512.0
 #define ASPECT 0.8			// aspect ratio
@@ -12,7 +13,6 @@
 #define BADGE_TSV @"tab"
 
 static CGContextRef createRGBABitmapContext(CGSize pixelSize);
-//static CGContextRef createVectorContext(CGSize pixelSize)
 
 
 /**
@@ -24,29 +24,10 @@ OSStatus GenerateThumbnailForURL(void *thisInterface, QLThumbnailRequestRef thum
 {
 	@autoreleasepool {
 		NSURL *myURL = (__bridge NSURL *)url;
-		NSError *theErr = nil;
-		
-		// Load document data using NSStrings house methods
-		// For huge files, maybe guess file encoding using `file --brief --mime` and use NSFileHandle? Not for now...
+
 		NSStringEncoding stringEncoding;
-		NSString *fileString = [NSString stringWithContentsOfURL:myURL usedEncoding:&stringEncoding error:&theErr];
-		
-		// We could not open the file, probably unknown encoding; try ISO-8859-1
-		if (!fileString) {
-			stringEncoding = NSISOLatin1StringEncoding;
-			fileString = [NSString stringWithContentsOfURL:myURL encoding:stringEncoding error:&theErr];
-			
-			// Still no success, give up
-			if (!fileString) {
-				if (nil != theErr) {
-					NSLog(@"Error opening the file: %@", theErr);
-				}
-				
-				return noErr;
-			}
-		}
-		
-		
+		NSString *fileString = [EncodingUtil stringWithContentsOfURL:myURL usedEncoding:&stringEncoding];
+
 		// Parse the data if still interested in the thumbnail
 		if (false == QLThumbnailRequestIsCancelled(thumbnail)) {
 			CSVDocument *csvDoc = [CSVDocument new];
@@ -227,10 +208,10 @@ OSStatus GenerateThumbnailForURL(void *thisInterface, QLThumbnailRequestRef thum
 	return noErr;
 }
 
+
 void CancelThumbnailGeneration(void* thisInterface, QLThumbnailRequestRef thumbnail)
 {
 }
-
 
 
 #pragma mark - Creating a bitmap context
@@ -262,40 +243,3 @@ static CGContextRef createRGBABitmapContext(CGSize pixelSize)
 	
 	return context;
 }
-
-/*
-static CGContextRef createVectorContext(CGSize pixelSize)
-{
-	CGRect mediaBox = CGRectMake(0.f, 0.f, 0.f, 0.f);
-	mediaBox.size = pixelSize;
-	
-	// allocate needed bytes
-	CFMutableDataRef data = CFDataCreateMutable(kCFAllocatorDefault, 0);		// unlimited size; hopefully we won't regret this :)
-	if (NULL == bitmapData) {
-		fprintf(stderr, "Oops, could not allocate mutable data!");
-		return NULL;
-	}
-	
-	// create the context
-	CGDataConsumerRef consumer = CGDataConsumerCreateWithCFData(data);
-	CGContextRef context = CGPDFContextCreate(consumer, &mediaBox, NULL);	
-	CGDataConsumerRelease(consumer);
-	
-	// context creation fail
-	if (NULL == context) {
-		free(bitmapData);
-		fprintf(stderr, "Oops, could not create the context!");
-		return NULL;
-	}
-	
-	return context;
-	
-	
-	// Don't forget creating pages
-	// CGPDFContextBeginPage(pdfContext, NULL);
-	// CGPDFContextEndPage(pdfContext);
-	
-	// and release the data
-	// CFRelease(data);
-}	//	*/
-
